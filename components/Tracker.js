@@ -5,6 +5,7 @@ import { useTrackerData } from "@/lib/useTrackerData";
 import Pomodoro from "./Pomodoro";
 import Reminders from "./Reminders";
 import Milestones from "./Milestones";
+import Scorecard from "./Scorecard";
 
 // ─── Date Utilities (all local timezone safe) ───
 
@@ -108,7 +109,7 @@ export default function Tracker() {
   const [showDatePicker, setShowDatePicker] = useState(false);
   const [newGoal, setNewGoal] = useState("");
   const [expandedTask, setExpandedTask] = useState(null);
-  const [editingField, setEditingField] = useState(null); // { taskId, field: "text"|"notes" }
+  const [editingField, setEditingField] = useState(null);
   const [editValue, setEditValue] = useState("");
   const [showGoalInput, setShowGoalInput] = useState(false);
   const [animateIn, setAnimateIn] = useState(true);
@@ -128,7 +129,6 @@ export default function Tracker() {
   useEffect(() => { setAnimateIn(false); const t = setTimeout(() => setAnimateIn(true), 50); return () => clearTimeout(t); }, [view, selectedDate]);
   useEffect(() => { if ("serviceWorker" in navigator) navigator.serviceWorker.register("/sw.js").catch(() => {}); }, []);
 
-  // Sync weekly note text when date or data changes
   const currentWeekStart = getWeekStart(selectedDate);
   useEffect(() => {
     if (data?.weeklyNotes) {
@@ -215,7 +215,6 @@ export default function Tracker() {
     return total;
   };
 
-  // Weekly notes auto-save
   const handleWeeklyNoteChange = (val) => {
     setWeeklyNoteText(val);
     clearTimeout(weeklyNoteSaveTimer.current);
@@ -224,7 +223,6 @@ export default function Tracker() {
     }, 800);
   };
 
-  // Get weekly notes for a given range (for review views)
   const getWeeklyNotesInRange = (range) => {
     const days = getDaysInRange(range.start, range.end);
     const weekStarts = new Set();
@@ -292,7 +290,7 @@ export default function Tracker() {
 
       {/* Tabs */}
       <div className="flex gap-0.5 py-3 border-b border-surface-2">
-        {["daily", "weekly", "monthly", "quarterly"].map((v) => (
+        {["daily", "weekly", "monthly", "quarterly", "scorecard"].map((v) => (
           <button key={v} onClick={() => setView(v)}
             className={`flex-1 py-2 text-xs font-medium rounded-md transition-all tracking-wide ${view === v ? "bg-surface-2 text-gold font-semibold" : "text-neutral-600 hover:text-neutral-400"}`}>
             {v.charAt(0).toUpperCase() + v.slice(1)}
@@ -418,7 +416,6 @@ export default function Tracker() {
                 const isEditingNotes = editingField?.taskId === task.id && editingField?.field === "notes";
                 return (
                   <div key={task.id} className="rounded-lg transition-all" style={{ animation: `fadeSlideIn 0.3s ease ${i * 0.05}s both`, background: isExpanded ? "#111" : "transparent" }}>
-                    {/* Main row */}
                     <div className="flex items-center gap-2.5 px-2 py-2.5" style={{ opacity: task.done ? 0.5 : 1 }}>
                       <button onClick={() => toggleTask(task.id)}
                         className="w-[22px] h-[22px] rounded-md border-2 flex items-center justify-center shrink-0 transition-all"
@@ -443,10 +440,8 @@ export default function Tracker() {
                       <button onClick={() => deleteTask(task.id)} className="text-neutral-700 text-lg hover:text-neutral-400 transition-colors shrink-0 px-1">&times;</button>
                     </div>
 
-                    {/* Expanded detail */}
                     {isExpanded && (
                       <div className="px-3 pb-3 pt-0">
-                        {/* Notes */}
                         <div className="ml-8 mb-2">
                           {isEditingNotes ? (
                             <textarea ref={editInputRef} value={editValue} onChange={(e) => setEditValue(e.target.value)}
@@ -460,7 +455,6 @@ export default function Tracker() {
                             </div>
                           )}
                         </div>
-                        {/* Actions */}
                         <div className="ml-8 flex gap-2">
                           <button onClick={() => startEditField(task, "text")}
                             className="text-[10px] text-neutral-500 font-mono border border-neutral-700 rounded px-2 py-0.5 hover:text-neutral-300 transition-colors">
@@ -485,7 +479,6 @@ export default function Tracker() {
             </div>
             <StatsCards stats={weekStats} pomoSessions={calcPomoStats(weekRange)} />
 
-            {/* Weekly Notes */}
             <div className="bg-[#0f0f0f] border border-surface-3 rounded-xl p-4 mb-6">
               <div className="flex justify-between items-center mb-2">
                 <h3 className="text-sm font-semibold text-neutral-300">Week Notes</h3>
@@ -538,7 +531,6 @@ export default function Tracker() {
             </div>
             <StatsCards stats={quarterStats} pomoSessions={calcPomoStats(quarterRange)} />
 
-            {/* 12 Week Goals */}
             <div className="bg-[#0f0f0f] border border-surface-3 rounded-xl p-4 mb-6">
               <div className="flex justify-between items-center mb-3">
                 <h3 className="text-sm font-semibold text-neutral-300">12 Week Goals</h3>
@@ -565,6 +557,10 @@ export default function Tracker() {
             <ReviewDays days={getReviewDays(quarterRange)} toggleTask={toggleTask} />
           </div>
         )}
+
+        {/* ═══ SCORECARD VIEW ═══ */}
+        {view === "scorecard" && <Scorecard />}
+
       </div>
     </div>
   );
