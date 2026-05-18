@@ -66,7 +66,11 @@ function getWeekStart() {
   const now = new Date();
   const sunday = new Date(now);
   sunday.setDate(now.getDate() - now.getDay());
-  return sunday.toISOString().split("T")[0];
+  // Use local date string to avoid UTC timezone rollover
+  const y = sunday.getFullYear();
+  const m = String(sunday.getMonth() + 1).padStart(2, "0");
+  const d = String(sunday.getDate()).padStart(2, "0");
+  return `${y}-${m}-${d}`;
 }
 
 function formatWeekLabel(dateStr) {
@@ -165,11 +169,16 @@ export default function Scorecard() {
       warning_signs:       form.warning_signs || null,
       overall_status:      overall,
     };
-    await supabase.from("scorecard_reviews").upsert([payload], { onConflict: "week_start" });
+    const { error } = await supabase.from("scorecard_reviews").upsert([payload], { onConflict: "week_start" });
+    if (error) {
+      console.error("Scorecard save error:", error);
+      alert(`Save failed: ${error.message}`);
+    } else {
+      setSaved(true);
+      setTimeout(() => setSaved(false), 2500);
+      loadHistory();
+    }
     setSaving(false);
-    setSaved(true);
-    setTimeout(() => setSaved(false), 2500);
-    loadHistory();
   }
 
   const overall = getOverallStatus(form);
