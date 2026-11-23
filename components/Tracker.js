@@ -34,21 +34,17 @@ const formatShortDay = (d) =>
 
 const formatDayNum = (d) => parseLocal(d).getDate();
 
-// Quarter alignment: Q1=Jan1, Q2=Apr1, Q3=Jul1, Q4=Oct1
-const getQuarterStart = (date) => {
-  const d = parseLocal(date);
-  const qStart = Math.floor(d.getMonth() / 3) * 3;
-  return new Date(d.getFullYear(), qStart, 1);
-};
+// ─── 12 Week cycle ───
+// To start a new cycle, change CYCLE_START (use a Sunday so it lines up with the Sun-Sat week grid).
+const CYCLE_START = "2026-11-22";
+const CYCLE_WEEKS = 12;
 
-const getQuarterNum = (date) => Math.floor(parseLocal(date).getMonth() / 3) + 1;
+const getCycleStart = () => parseLocal(CYCLE_START);
 
-const getWeekOfQuarter = (date) => {
-  const d = parseLocal(date);
-  const quarterStart = getQuarterStart(date);
-  const diffMs = d - quarterStart;
-  const diffDays = Math.floor(diffMs / 86400000);
-  return Math.min(12, Math.floor(diffDays / 7) + 1);
+const getWeekOfCycle = (date) => {
+  // Math.round keeps this correct across daylight saving changes
+  const diffDays = Math.round((parseLocal(date) - getCycleStart()) / 86400000);
+  return Math.max(1, Math.min(CYCLE_WEEKS, Math.floor(diffDays / 7) + 1));
 };
 
 const getDaysInRange = (start, end) => {
@@ -80,10 +76,10 @@ const getMonthRange = (date) => {
   return { start: toKey(new Date(d.getFullYear(), d.getMonth(), 1)), end: toKey(new Date(d.getFullYear(), d.getMonth() + 1, 0)) };
 };
 
-const getQuarterRange = (date) => {
-  const d = parseLocal(date);
-  const qStart = Math.floor(d.getMonth() / 3) * 3;
-  return { start: toKey(new Date(d.getFullYear(), qStart, 1)), end: toKey(new Date(d.getFullYear(), qStart + 3, 0)) };
+const getCycleRange = () => {
+  const s = getCycleStart();
+  const e = new Date(s.getFullYear(), s.getMonth(), s.getDate() + CYCLE_WEEKS * 7 - 1);
+  return { start: toKey(s), end: toKey(e) };
 };
 
 // ─── Main Component ───
@@ -148,11 +144,11 @@ export default function Tracker() {
   const isToday = selectedDate === todayKey;
   const weekRange = getWeekRange(selectedDate);
   const monthRange = getMonthRange(selectedDate);
-  const quarterRange = getQuarterRange(selectedDate);
+  const quarterRange = getCycleRange();
   const weekStats = calcStats(data, weekRange);
   const monthStats = calcStats(data, monthRange);
   const quarterStats = calcStats(data, quarterRange);
-  const weekOfQuarter = getWeekOfQuarter(selectedDate);
+  const weekOfQuarter = getWeekOfCycle(selectedDate);
   const streak = calcStreak(data, todayKey);
   const todayPomoSessions = (data.pomodoroSessions || {})[todayKey] || 0;
 
@@ -284,7 +280,7 @@ export default function Tracker() {
           ))}
         </div>
         <div className="text-[10px] text-neutral-600 font-mono text-right mt-1.5">
-          Q{getQuarterNum(selectedDate)} &bull; {Math.round((weekOfQuarter / 12) * 100)}% through quarter
+          12 Week Cycle &bull; {Math.round((weekOfQuarter / 12) * 100)}% through cycle
         </div>
       </div>
 
@@ -527,7 +523,7 @@ export default function Tracker() {
           <div>
             <div className="mb-5">
               <h2 className="text-lg font-bold text-white tracking-tight">Quarterly Review</h2>
-              <span className="text-xs text-neutral-500 font-mono">Q{getQuarterNum(selectedDate)} {parseLocal(selectedDate).getFullYear()} &bull; Week {weekOfQuarter}/12</span>
+              <span className="text-xs text-neutral-500 font-mono">12 Week Cycle &bull; Week {weekOfQuarter}/12</span>
             </div>
             <StatsCards stats={quarterStats} pomoSessions={calcPomoStats(quarterRange)} />
 
