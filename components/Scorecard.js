@@ -1,12 +1,7 @@
 "use client";
 import { useState, useEffect, useCallback } from "react";
-import { createClient } from "@supabase/supabase-js";
+import { supabase } from "@/lib/supabase";
 import { getCycleWeek } from "@/lib/cycle";
-
-const supabase = createClient(
-  process.env.NEXT_PUBLIC_SUPABASE_URL,
-  process.env.NEXT_PUBLIC_SUPABASE_ANON_KEY
-);
 
 // Christian Xavier Hospitality Group, Cycle 1.
 // Number metrics: green at/above `green`, yellow at/above `yellow`, red below.

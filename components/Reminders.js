@@ -1,6 +1,16 @@
 "use client";
 
 import { useState, useEffect } from "react";
+import { supabase } from "@/lib/supabase";
+
+// The subscribe route only accepts requests from your signed-in session
+async function authHeaders() {
+  const { data } = await supabase.auth.getSession();
+  return {
+    "Content-Type": "application/json",
+    Authorization: `Bearer ${data?.session?.access_token || ""}`,
+  };
+}
 
 const VAPID_PUBLIC_KEY = process.env.NEXT_PUBLIC_VAPID_PUBLIC_KEY;
 
@@ -73,7 +83,7 @@ export default function Reminders() {
       // Send subscription to server
       const res = await fetch("/api/push/subscribe", {
         method: "POST",
-        headers: { "Content-Type": "application/json" },
+        headers: await authHeaders(),
         body: JSON.stringify({ subscription: subscription.toJSON() }),
       });
 
@@ -96,7 +106,7 @@ export default function Reminders() {
         // Tell server to remove
         await fetch("/api/push/subscribe", {
           method: "POST",
-          headers: { "Content-Type": "application/json" },
+          headers: await authHeaders(),
           body: JSON.stringify({
             subscription: subscription.toJSON(),
             action: "unsubscribe",
