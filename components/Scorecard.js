@@ -1,60 +1,65 @@
 "use client";
 import { useState, useEffect, useCallback } from "react";
 import { createClient } from "@supabase/supabase-js";
+import { getCycleWeek } from "@/lib/cycle";
 
 const supabase = createClient(
   process.env.NEXT_PUBLIC_SUPABASE_URL,
   process.env.NEXT_PUBLIC_SUPABASE_ANON_KEY
 );
 
+// Christian Xavier Hospitality Group, Cycle 1.
+// Number metrics: green at/above `green`, yellow at/above `yellow`, red below.
+// Select metrics: `statusMap` turns each saved value into green / yellow / red / gray (gray is not scored).
+// `startWeek`: before that cycle week a low number is not scored (only a hit shows green).
 const METRICS = {
-  outreach_count:       { label: "Emails + LinkedIn sent",         type: "number", green: 10,  yellow: 6,   note: "Target: 10+ per week" },
-  followup_status:      { label: "Follow-ups sent on due prospects", type: "select", note: "All sent / Some missed / None sent" },
-  building_distracted:  { label: "Did building distract from selling?", type: "select", note: "No / A little / Yes significantly" },
-  consults_booked:      { label: "Free consultations booked",       type: "number", green: 1,   yellow: 0.5, note: "Target: 1+ per week" },
-  prospects_added:      { label: "New prospects added to tracker",  type: "number", green: 5,   yellow: 2,   note: "Target: 5+ per week" },
-  mentor_status:        { label: "Mentor program touched",          type: "select", note: "Required every other week" },
-  intel_status:         { label: "Intelligence feed reviewed",      type: "select", note: "Reviewed + used in outreach" },
-  cert_hours:           { label: "SecAI+ study time (hours)",       type: "number", green: 2,   yellow: 1,   note: "Target: 2+ hours per week" },
+  partner_outreach_count: { label: "Partner & lounge outreach touches", type: "number", green: 1, yellow: 0.5, note: "Target: 1–2 per week (D'Floridian + lounge owners)" },
+  followup_status:        { label: "Follow-ups sent to warm contacts", type: "select", note: "All sent / Some missed / None due",
+                            statusMap: { all: "green", some: "yellow", none: "gray" } },   // "none" = None due, not scored
+  building_distracted:    { label: "Did tinkering or coding distract from hospitality & discovery?", type: "select", note: "No / A little / Yes significantly",
+                            statusMap: { no: "green", little: "yellow", yes: "red" } },
+  mom_test_count:         { label: "Mom Test discovery conversations completed", type: "number", green: 1, yellow: 0.5, startWeek: 6, note: "Target: 1 per week in Weeks 6–12 (Goal: 6–7 total)" },
+  venues_added:           { label: "New partner venues or lounges added to tracker", type: "number", green: 1, yellow: 0.5, note: "Target: 1–2 per week (Atlanta & Monroe)" },
+  ops_sync_status:        { label: "Sunday cousin & brand operations sync", type: "select", note: "Weekly 15–20 min alignment",
+                            statusMap: { completed: "green", rescheduled: "yellow", missed: "red" } },
+  reading_status:         { label: "10x / Mom Test reading + 1 concrete takeaway logged", type: "select", note: "Target: 3+ sessions per week",
+                            statusMap: { "3plus": "green", "1to2": "yellow", none: "red" } },
+  craft_sessions:         { label: "CCST study + rolling craft sessions", type: "number", green: 3, yellow: 1.5, note: "Target: 3–4 sessions per week" },
 };
 
 const SELECT_OPTIONS = {
-  followup_status:     [{ val: "", label: "—" }, { val: "all",  label: "All sent" }, { val: "some", label: "Some missed" }, { val: "none", label: "None sent" }],
-  building_distracted: [{ val: "", label: "—" }, { val: "no",   label: "No" },       { val: "little", label: "A little" }, { val: "yes",  label: "Yes" }],
-  mentor_status:       [{ val: "", label: "—" }, { val: "yes",  label: "Yes" },      { val: "planned", label: "Planned" }, { val: "skipped", label: "Skipped" }, { val: "na", label: "N/A this week" }],
-  intel_status:        [{ val: "", label: "—" }, { val: "used", label: "Used it" },  { val: "reviewed", label: "Reviewed" }, { val: "no", label: "Not checked" }],
+  followup_status:     [{ val: "", label: "-" }, { val: "all", label: "All sent" }, { val: "some", label: "Some missed" }, { val: "none", label: "None due" }],
+  building_distracted: [{ val: "", label: "-" }, { val: "no", label: "No" }, { val: "little", label: "A little" }, { val: "yes", label: "Yes significantly" }],
+  ops_sync_status:     [{ val: "", label: "-" }, { val: "completed", label: "Completed" }, { val: "rescheduled", label: "Rescheduled" }, { val: "missed", label: "Missed" }],
+  reading_status:      [{ val: "", label: "-" }, { val: "3plus", label: "3+ sessions" }, { val: "1to2", label: "1–2 sessions" }, { val: "none", label: "None" }],
 };
 
 const PREMORTEM_WARNINGS = [
-  "Outreach volume dropped below 10 this week",
-  "Building tools instead of having sales conversations",
-  "Financial pressure making me consider a new job or bonus",
-  "Mentor program untouched for 2+ weeks",
-  "Silence from prospects killing confidence and slowing outreach",
-  "No case study or testimonial in progress",
-  "Free consultation calls not converting to proposals",
+  `Zero partner or lounge owner conversations this week`,
+  `Thinking about building software before passing the 4 Q1 Gates`,
+  `Waiting to "feel ready" before having a casual chat with D'Floridian`,
+  `Pitching ideas instead of asking Mom Test questions about past behavior`,
+  `CCST study or rolling kit untouched all week`,
+  `Skipped Sunday sync with Monroe partner`,
+  `Letting W-2 onboarding or holiday stress bleed into venture hours`,
 ];
 
-function getStatus(key, value) {
+function getStatus(key, value, cycleWeek) {
   const m = METRICS[key];
   if (!value && value !== 0) return "gray";
   if (m.type === "number") {
     const v = parseFloat(value);
     if (isNaN(v)) return "gray";
     if (v >= m.green) return "green";
+    if (m.startWeek && cycleWeek < m.startWeek) return "gray";
     if (v >= m.yellow) return "yellow";
     return "red";
-  } else {
-    if (!value) return "gray";
-    if (["all", "no", "yes", "used"].includes(value)) return "green";
-    if (["some", "little", "planned", "reviewed"].includes(value)) return "yellow";
-    if (["none", "skipped"].includes(value)) return "red";
-    return "gray";
   }
+  return m.statusMap[value] || "gray";
 }
 
-function getOverallStatus(form) {
-  const statuses = Object.keys(METRICS).map(k => getStatus(k, form[k])).filter(s => s !== "gray");
+function getOverallStatus(form, cycleWeek) {
+  const statuses = Object.keys(METRICS).map(k => getStatus(k, form[k], cycleWeek)).filter(s => s !== "gray");
   if (statuses.length === 0) return "gray";
   const score = statuses.reduce((sum, s) => sum + (s === "green" ? 3 : s === "yellow" ? 2 : 1), 0) / statuses.length;
   if (score >= 2.5) return "green";
@@ -100,15 +105,15 @@ const SECTION_STYLES = {
 };
 
 const METRIC_SECTIONS = {
-  outreach: ["outreach_count", "followup_status", "building_distracted"],
-  pipeline: ["consults_booked", "prospects_added"],
-  strategic: ["mentor_status", "intel_status", "cert_hours"],
+  outreach: ["partner_outreach_count", "followup_status", "building_distracted"],
+  pipeline: ["mom_test_count", "venues_added"],
+  strategic: ["ops_sync_status", "reading_status", "craft_sessions"],
 };
 
 const emptyForm = {
-  outreach_count: "", followup_status: "", building_distracted: "",
-  consults_booked: "", prospects_added: "", mentor_status: "",
-  intel_status: "", cert_hours: "", reflection: "", warning_signs: "",
+  partner_outreach_count: "", followup_status: "", building_distracted: "",
+  mom_test_count: "", venues_added: "", ops_sync_status: "",
+  reading_status: "", craft_sessions: "", reflection: "", warning_signs: "",
 };
 
 export default function Scorecard() {
@@ -118,6 +123,7 @@ export default function Scorecard() {
   const [history, setHistory] = useState([]);
   const [historyView, setHistoryView] = useState(false);
   const weekStart = getWeekStart();
+  const cycleWeek = getCycleWeek(weekStart);
 
   const loadCurrentWeek = useCallback(async () => {
     const { data } = await supabase
@@ -127,16 +133,16 @@ export default function Scorecard() {
       .single();
     if (data) {
       setForm({
-        outreach_count:      data.outreach_count ?? "",
-        followup_status:     data.followup_status ?? "",
-        building_distracted: data.building_distracted ?? "",
-        consults_booked:     data.consults_booked ?? "",
-        prospects_added:     data.prospects_added ?? "",
-        mentor_status:       data.mentor_status ?? "",
-        intel_status:        data.intel_status ?? "",
-        cert_hours:          data.cert_hours ?? "",
-        reflection:          data.reflection ?? "",
-        warning_signs:       data.warning_signs ?? "",
+        partner_outreach_count: data.partner_outreach_count ?? "",
+        followup_status:        data.followup_status ?? "",
+        building_distracted:    data.building_distracted ?? "",
+        mom_test_count:         data.mom_test_count ?? "",
+        venues_added:           data.venues_added ?? "",
+        ops_sync_status:        data.ops_sync_status ?? "",
+        reading_status:         data.reading_status ?? "",
+        craft_sessions:         data.craft_sessions ?? "",
+        reflection:             data.reflection ?? "",
+        warning_signs:          data.warning_signs ?? "",
       });
     }
   }, [weekStart]);
@@ -145,6 +151,7 @@ export default function Scorecard() {
     const { data } = await supabase
       .from("scorecard_reviews")
       .select("*")
+      .not("partner_outreach_count", "is", null) // only reviews saved with the Cycle 1 form
       .order("week_start", { ascending: false })
       .limit(12);
     if (data) setHistory(data);
@@ -154,20 +161,20 @@ export default function Scorecard() {
 
   async function save() {
     setSaving(true);
-    const overall = getOverallStatus(form);
+    const overall = getOverallStatus(form, cycleWeek);
     const payload = {
       week_start: weekStart,
-      outreach_count:      parseInt(form.outreach_count) || 0,
-      followup_status:     form.followup_status || null,
-      building_distracted: form.building_distracted || null,
-      consults_booked:     parseInt(form.consults_booked) || 0,
-      prospects_added:     parseInt(form.prospects_added) || 0,
-      mentor_status:       form.mentor_status || null,
-      intel_status:        form.intel_status || null,
-      cert_hours:          parseFloat(form.cert_hours) || 0,
-      reflection:          form.reflection || null,
-      warning_signs:       form.warning_signs || null,
-      overall_status:      overall,
+      partner_outreach_count: parseInt(form.partner_outreach_count) || 0,
+      followup_status:        form.followup_status || null,
+      building_distracted:    form.building_distracted || null,
+      mom_test_count:         parseInt(form.mom_test_count) || 0,
+      venues_added:           parseInt(form.venues_added) || 0,
+      ops_sync_status:        form.ops_sync_status || null,
+      reading_status:         form.reading_status || null,
+      craft_sessions:         parseInt(form.craft_sessions) || 0,
+      reflection:             form.reflection || null,
+      warning_signs:          form.warning_signs || null,
+      overall_status:         overall,
     };
     const { error } = await supabase.from("scorecard_reviews").upsert([payload], { onConflict: "week_start" });
     if (error) {
@@ -181,7 +188,7 @@ export default function Scorecard() {
     setSaving(false);
   }
 
-  const overall = getOverallStatus(form);
+  const overall = getOverallStatus(form, cycleWeek);
   const oc = OVERALL_CONFIG[overall];
 
   return (
@@ -213,7 +220,7 @@ export default function Scorecard() {
                   <div>
                     <p className="text-sm font-medium text-white">Week of {formatWeekLabel(h.week_start)}</p>
                     <p className="text-xs text-zinc-400 mt-0.5">
-                      {h.outreach_count || 0} outreach • {h.consults_booked || 0} consults • {h.cert_hours || 0}h study
+                      {h.partner_outreach_count || 0} outreach • {h.mom_test_count || 0} Mom Tests • {h.craft_sessions || 0} craft sessions
                     </p>
                   </div>
                   <span className={`text-sm font-bold ${hc.text}`}>{hc.icon} {hc.label}</span>
@@ -247,7 +254,7 @@ export default function Scorecard() {
               <div className="space-y-2">
                 {keys.map(key => {
                   const m = METRICS[key];
-                  const status = getStatus(key, form[key]);
+                  const status = getStatus(key, form[key], cycleWeek);
                   const sc = STATUS_CONFIG[status];
                   return (
                     <div key={key} className="bg-zinc-900 border border-zinc-800 rounded-xl p-3 flex items-center gap-3">
@@ -259,7 +266,7 @@ export default function Scorecard() {
                       <div className="flex items-center gap-2 flex-shrink-0">
                         {m.type === "number" ? (
                           <input
-                            type="number" min="0" step="0.5"
+                            type="number" min="0" step="1"
                             value={form[key]}
                             onChange={e => setForm(prev => ({ ...prev, [key]: e.target.value }))}
                             placeholder="0"
@@ -291,7 +298,7 @@ export default function Scorecard() {
               <span className="flex-1 h-px bg-zinc-800 block"></span>
             </p>
             <p className="text-sm text-white mb-2 leading-relaxed">
-              "Did I do enough this week to hit $10K/month by October — or did I find reasons not to?"
+              "Did I build real hospitality craft, relationships, and validated truth this week — or did I hide behind busywork and stress?"
             </p>
             <textarea
               value={form.reflection}

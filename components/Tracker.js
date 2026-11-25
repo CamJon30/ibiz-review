@@ -2,6 +2,7 @@
 
 import { useState, useEffect, useRef } from "react";
 import { useTrackerData } from "@/lib/useTrackerData";
+import { CYCLE_START, CYCLE_WEEKS } from "@/lib/cycle";
 import Pomodoro from "./Pomodoro";
 import Reminders from "./Reminders";
 import Milestones from "./Milestones";
@@ -35,9 +36,7 @@ const formatShortDay = (d) =>
 const formatDayNum = (d) => parseLocal(d).getDate();
 
 // ─── 12 Week cycle ───
-// To start a new cycle, change CYCLE_START (use a Sunday so it lines up with the Sun-Sat week grid).
-const CYCLE_START = "2026-11-22";
-const CYCLE_WEEKS = 12;
+// CYCLE_START and CYCLE_WEEKS live in lib/cycle.js (shared with the Scorecard).
 
 const getCycleStart = () => parseLocal(CYCLE_START);
 
