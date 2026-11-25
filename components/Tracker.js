@@ -7,6 +7,7 @@ import Pomodoro from "./Pomodoro";
 import Reminders from "./Reminders";
 import Milestones from "./Milestones";
 import Scorecard from "./Scorecard";
+import CycleTheme from "./CycleTheme";
 
 // ─── Date Utilities (all local timezone safe) ───
 
@@ -88,7 +89,7 @@ export default function Tracker() {
     data,
     addTask: dbAddTask, toggleTask: dbToggleTask, deleteTask: dbDeleteTask, updateTask: dbUpdateTask,
     addGoal: dbAddGoal, removeGoal: dbRemoveGoal,
-    addPomoSession, updateWeeklyNotes: dbUpdateWeeklyNotes,
+    addPomoSession, updateWeeklyNotes: dbUpdateWeeklyNotes, updateCycleTheme: dbUpdateCycleTheme,
     addReminder: dbAddReminder, updateReminder: dbUpdateReminder, deleteReminder: dbDeleteReminder,
     refresh,
   } = useTrackerData();
@@ -524,6 +525,8 @@ export default function Tracker() {
               <h2 className="text-lg font-bold text-white tracking-tight">Quarterly Review</h2>
               <span className="text-xs text-neutral-500 font-mono">12 Week Cycle &bull; Week {weekOfQuarter}/12</span>
             </div>
+            <CycleTheme theme={(data.themes || {})[CYCLE_START] || ""} onSave={(text) => dbUpdateCycleTheme(CYCLE_START, text)} />
+
             <StatsCards stats={quarterStats} pomoSessions={calcPomoStats(quarterRange)} />
 
             <div className="bg-[#0f0f0f] border border-surface-3 rounded-xl p-4 mb-6">
